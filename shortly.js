@@ -1,7 +1,9 @@
 var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
+var sessions = require('express-session');
 var bodyParser = require('body-parser');
+var bcrypt = require('bcrypt-nodejs');
 
 
 var db = require('./app/config');
@@ -22,26 +24,99 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
+app.use(sessions({
+  resave: false,
+  saveUninitialized: false,
+  secret: 'blahblah',
+  cookie: {maxAge: 60*60*1000, authed: false}
+}));
 
-app.get('/', 
-function(req, res) {
+/*
+app.use(function(req,res,next) {
+  if (!req.session.authed && req.method!=='POST') {
+    if (req.path==='/signup') {
+      res.render('signup');
+    } else {
+      if (req.path!=='/login') {
+        res.redirect('login');
+      } else {
+        res.render('login');
+      }
+    }
+  } else {
+    next();
+  }
+});
+*/
+
+var authenticate = function (username, password, cb) {
+  // User.forge()?? maybe Users??
+  new User({ username: username}).fetch().then(function(found) {
+    // console.log(found.attributes.password);
+    if (!found) {return cb(false);}
+    //console.log('found: ', found);
+    // console.log("password: ", found.get('password'));
+
+      bcrypt.compare(password, found.get('password'), function(err, res){
+        cb(res);
+      });
+
+    //cb(found);
+  });
+};
+
+app.get('/login', function(req,res) {
+  res.render('login');
+});
+
+app.post('/login', function(req,res){
+  authenticate(req.body.username,req.body.password, function(user) {
+    if (!user) {
+      res.redirect('/login');
+    } else {
+      req.session.regenerate(function() {
+        req.session.authed = true;
+        res.redirect('/');
+      });
+    }
+  });
+});
+    
+
+app.get('/', function(req, res) {
+  if (!req.session.authed) res.redirect('login');
   res.render('index');
 });
 
-app.get('/create', 
-function(req, res) {
-  res.render('index');
+app.get('/signup', function(req,res) {
+  res.render('signup');
 });
 
-app.get('/links', 
-function(req, res) {
+app.post('/signup', function(req,res){
+  var user = new User({
+    username: req.body.username,
+    password: req.body.password
+  });
+  user.save()
+    .then(function(newUser) {
+      req.session.regenerate(function() {
+        req.session.authed = true;
+        res.redirect('/');
+      });
+    });
+}); 
+
+app.get('/links', function(req, res) {
+  if (!req.session.authed) res.redirect('login');
+
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
-app.post('/links', 
-function(req, res) {
+app.post('/links', function(req, res) {
+  if (!req.session.authed) res.redirect('login');
+
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
@@ -71,6 +146,12 @@ function(req, res) {
         });
       });
     }
+  });
+});
+
+app.get('/logout', function(req, res){
+  req.session.destroy(function(){
+    res.redirect('/');
   });
 });
 
