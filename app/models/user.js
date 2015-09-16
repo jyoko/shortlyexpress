@@ -9,7 +9,6 @@ var User = db.Model.extend({
   links: function() {
     return this.hasMany(Link);
   },
-  // each user has a 
   initialize: function() {
     this.on('creating', function(model, attrs, options){
         //maybe Sync or return promise?
@@ -19,25 +18,12 @@ var User = db.Model.extend({
                 model.set('password', hash);
               });
     });
+  },
+  compareHash: function(password, match, cb) {
+    bcrypt.compareAsync(password, match.get('password')).then(function(result) {
+      cb(result);
+    });
   }
 });
-
-// var Link = db.Model.extend({
-//   tableName: 'urls',
-//   hasTimestamps: true,
-//   defaults: {
-//     visits: 0
-//   },
-//   clicks: function() {
-//     return this.hasMany(Click);
-//   },
-//   initialize: function(){
-//     this.on('creating', function(model, attrs, options){
-//       var shasum = crypto.createHash('sha1');
-//       shasum.update(model.get('url'));
-//       model.set('code', shasum.digest('hex').slice(0, 5));
-//     });
-//   }
-// });
 
 module.exports = User;

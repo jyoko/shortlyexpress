@@ -4,6 +4,10 @@ var partials = require('express-partials');
 var sessions = require('express-session');
 var bodyParser = require('body-parser');
 var bcrypt = require('bcrypt-nodejs');
+var passport = require('passport');
+var GitHubStrategy = require('passport-github2').Strategy;
+var GITHUB_CLIENT_ID = require('./config').id;
+var GITHUB_CLIENT_SECRET = require('./config').secret;
 
 
 var db = require('./app/config');
@@ -49,28 +53,12 @@ app.use(function(req,res,next) {
 });
 */
 
-var authenticate = function (username, password, cb) {
-  // User.forge()?? maybe Users??
-  new User({ username: username}).fetch().then(function(found) {
-    // console.log(found.attributes.password);
-    if (!found) {return cb(false);}
-    //console.log('found: ', found);
-    // console.log("password: ", found.get('password'));
-
-      bcrypt.compare(password, found.get('password'), function(err, res){
-        cb(res);
-      });
-
-    //cb(found);
-  });
-};
-
 app.get('/login', function(req,res) {
   res.render('login');
 });
 
 app.post('/login', function(req,res){
-  authenticate(req.body.username,req.body.password, function(user) {
+  util.authenticate(req.body.username,req.body.password, function(user) {
     if (!user) {
       res.redirect('/login');
     } else {
@@ -84,8 +72,7 @@ app.post('/login', function(req,res){
     
 
 app.get('/', function(req, res) {
-  if (!req.session.authed) res.redirect('login');
-  res.render('index');
+  !req.session.authed ? res.redirect('login') : res.render('index');
 });
 
 app.get('/signup', function(req,res) {
